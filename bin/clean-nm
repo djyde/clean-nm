@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+const ora = require('ora')
+const fs = require('fs')
+const dayjs = require('dayjs')
+const rimraf = require('rimraf')
+
+const {
+  Select,
+  Confirm
+} = require('enquirer')
+const script = `find ${process.cwd()} -name "node_modules" -prune`
+
+const TIME = [
+  'a year',
+  '3 months',
+  '2 months',
+  'a month',
+  'Clean all found node_modules'
+]
+
+function humanFileSize(bytes, si) {
+  var thresh = si ? 1000 : 1024;
+  if (Math.abs(bytes) < thresh) {
+    return bytes + ' B';
+  }
+  var units = si ?
+    ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] :
+    ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+  var u = -1;
+  do {
+    bytes /= thresh;
+    ++u;
+  } while (Math.abs(bytes) >= thresh && u < units.length - 1);
+  return bytes.toFixed(1) + ' ' + units[u];
+}
+
+async function clean() {
+
+  const searchingSpinner = ora('Searching node_modules in current work directory (cwd)').start()
+
+  const {
+    stdout
+  } = await exec(script)
+
+  searchingSpinner.stop()
+
+  const dirs = stdout.trim().split('\n')
+
+  console.log('Found', dirs.length, 'node_modules folders')
+
+  const allDir = dirs.map(dir => {
+    const stat = fs.statSync(dir)
+    // const { ctime, mtime, size } = fs.statSync(dir)
+    return {
+      path: dir,
+      stat,
+    }
+  })
+
+  const prompt = new Select({
+    name: 'range',
+    message: 'Clean the node_modules which modified date is before:',
+    choices: [...TIME]
+  })
+
+  const range = await prompt.run()
+
+  const filteredDir = allDir.filter(_ => {
+    let compare;
+    switch (range) {
+      case TIME[0]:
+        compare = dayjs(_.stat.mtime).add(1, 'year')
+        break;
+      case TIME[1]:
+        compare = dayjs(_.stat.mtime).add(3, 'month')
+        break;
+      case TIME[2]:
+        compare = dayjs(_.stat.mtime).add(2, 'month')
+        break;
+      case TIME[3]:
+        compare = dayjs(_.stat.mtime).add(1, 'month')
+        break;
+      case TIME[4]:
+        return true;
+    }
+
+    return compare.isBefore(dayjs())
+  })
+
+  if (!filteredDir.length) {
+    console.log('No result')
+    return
+  }
+
+  const totalSize = filteredDir.reduce((a, b) => a + b.stat.size, filteredDir[0].stat.size)
+
+  const formattedSize = humanFileSize(totalSize * 1024)
+
+  console.log(filteredDir.map(_ => _.path).join('\n'))
+  console.log('Total:', formattedSize)
+
+  const confirmPrompt = new Confirm({
+    message: 'Are you sure clean all node_modules folders shown above?'
+  })
+
+  const confirm = await confirmPrompt.run()
+  if (confirm) {
+    // begin cleaning
+    const rmrf = util.promisify(rimraf)
+    const cleanSpinner = ora('Cleaning...').start()
+    await Promise.all(filteredDir.map(async dir => {
+      await rmrf(dir.path)
+    }))
+    cleanSpinner.stop()
+    console.log('Cleaning finished! Free', formattedSize, '!')
+  } else {
+    console.log('Bye')
+  }
+}
+
+clean()

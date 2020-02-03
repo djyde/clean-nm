@@ -1,0 +1,31 @@
+{
+  "name": "clean-nm",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "bin": {
+    "clean-nm": "bin/clean-nm"
+  },
+  "dependencies": {
+    "dayjs": "^1.8.19",
+    "enquirer": "^2.3.4",
+    "ora": "^4.0.3",
+    "rimraf": "^3.0.1"
+  },
+  "description": "Clean your node_modules legacy 💩",
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djyde/clean-nm.git"
+  },
+  "keywords": [
+    "node_modules"
+  ],
+  "author": "Randy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/djyde/clean-nm/issues"
+  },
+  "homepage": "https://github.com/djyde/clean-nm#readme"
+}
